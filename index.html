@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b5e7a">
+  <title>音声計測</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- はじめの画面 -->
+<section id="home" class="screen">
+  <header class="bar"><h1>音声計測</h1></header>
+  <main class="pad">
+    <button id="btnNew" class="big primary">＋ 新しく記録を始める</button>
+    <h2>これまでの記録</h2>
+    <p id="noSessions" class="muted">まだありません</p>
+    <ul id="sessionList" class="cards"></ul>
+
+    <details id="settingsBox" class="box">
+      <summary>送信先の設定（スプレッドシート）</summary>
+      <label>送信先 URL（GAS の Webアプリ）
+        <input id="setUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+      </label>
+      <label>パスワード
+        <input id="setPass" type="password" autocomplete="off">
+      </label>
+      <div class="row">
+        <button id="btnSaveSettings" class="primary">保存して接続を確認</button>
+        <span id="settingsMsg" class="muted"></span>
+      </div>
+    </details>
+    <p id="srWarn" class="warn" hidden>この端末のブラウザは音声認識に対応していません。Android は Chrome、iPhone / iPad は Safari で開いてください。</p>
+  </main>
+</section>
+
+<!-- 何を記録するかを決める画面 -->
+<section id="setup" class="screen" hidden>
+  <header class="bar"><button class="back" data-go="home">←</button><h1>記録の準備</h1></header>
+  <main class="pad">
+    <div class="grid2">
+      <label>日付 <input id="metaDate" type="date"></label>
+      <label>測定者 <input id="metaMeasurer" type="text" placeholder="例：長谷川"></label>
+    </div>
+    <label>記録名（水槽・ロットなど）<input id="metaName" type="text" placeholder="例：中棟1 ヒラメ"></label>
+
+    <h2>記録する項目 <small class="muted">（話す順番に並べます）</small></h2>
+    <ul id="fieldList" class="fields"></ul>
+    <details class="box">
+      <summary>＋ 項目を追加する</summary>
+      <div class="grid2">
+        <label>項目名 <input id="newLabel" type="text" placeholder="例：生殖腺重量"></label>
+        <label>種類
+          <select id="newType">
+            <option value="number">数値</option>
+            <option value="choice">選択（例：良・普・不良）</option>
+            <option value="id">番号・記号</option>
+            <option value="text">文字（言ったまま）</option>
+          </select>
+        </label>
+        <label>単位 <input id="newUnit" type="text" placeholder="例：g"></label>
+        <label>選択肢（, で区切る）<input id="newOptions" type="text" placeholder="例：良,普,不良"></label>
+      </div>
+      <button id="btnAddField">追加</button>
+    </details>
+
+    <h2>オプション</h2>
+    <label class="check"><input id="optReadback" type="checkbox" checked> 1尾ごとに値を読み上げる</label>
+    <label class="check"><input id="optCheck" type="checkbox" checked> おかしそうな値（けた違い・体長のわりに重い／軽い）を知らせる</label>
+
+    <button id="btnStart" class="big primary">測定を始める</button>
+  </main>
+</section>
+
+<!-- 測定の画面 -->
+<section id="measure" class="screen" hidden>
+  <header class="bar">
+    <button class="back" id="btnLeave">←</button>
+    <h1 id="mTitle"></h1>
+    <span id="syncState" class="sync"></span>
+  </header>
+  <main class="measure">
+    <div class="left">
+      <div class="fishcard">
+        <div class="fishno">No.<span id="curNo">1</span></div>
+        <div id="curFields" class="curfields"></div>
+        <div id="curMemo" class="memo" hidden></div>
+      </div>
+      <div id="banner" class="banner" hidden></div>
+      <div class="heard"><span class="muted">聞き取り：</span><span id="heard">—</span></div>
+      <div class="controls">
+        <button id="btnMic" class="mic">🎤 聞き取り開始</button>
+        <button id="btnUndo">取り消し</button>
+        <button id="btnSkip">空欄で次へ</button>
+        <button id="btnCommit">この魚を確定</button>
+      </div>
+      <p class="hint muted">話し方：数字だけ言えば上から順に入ります。「とりけし」「なし」「つぎ」「メモ ○○」「体重 312」のようにも言えます。7 は「なな」と読んでください。</p>
+    </div>
+    <div class="right">
+      <div class="listhead"><span><b id="countRows">0</b> 尾</span>
+        <span><button id="btnCsv">CSV保存</button> <button id="btnSyncNow">今すぐ送信</button></span></div>
+      <div class="tablewrap"><table id="rowsTable"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </main>
+</section>
+
+<!-- 行を直すダイアログ -->
+<dialog id="editDlg">
+  <form method="dialog" id="editForm">
+    <h2>No.<span id="editNo"></span> を直す</h2>
+    <div id="editFields"></div>
+    <label>メモ <input id="editMemo" type="text"></label>
+    <div class="row spread">
+      <button value="delete" id="btnDelRow" class="danger">この行を消す</button>
+      <span><button value="cancel">やめる</button> <button value="save" class="primary">保存</button></span>
+    </div>
+  </form>
+</dialog>
+
+<script src="parse.js"></script>
+<script src="core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
