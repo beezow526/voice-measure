@@ -18,19 +18,6 @@
     <p id="noSessions" class="muted">まだありません</p>
     <ul id="sessionList" class="cards"></ul>
 
-    <details id="settingsBox" class="box">
-      <summary>送信先の設定（スプレッドシート）</summary>
-      <label>送信先 URL（GAS の Webアプリ）
-        <input id="setUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
-      </label>
-      <label>パスワード
-        <input id="setPass" type="password" autocomplete="off">
-      </label>
-      <div class="row">
-        <button id="btnSaveSettings" class="primary">保存して接続を確認</button>
-        <span id="settingsMsg" class="muted"></span>
-      </div>
-    </details>
     <p id="srWarn" class="warn" hidden>この端末のブラウザは音声認識に対応していません。Android は Chrome、iPhone / iPad は Safari で開いてください。</p>
   </main>
 </section>
@@ -39,6 +26,11 @@
 <section id="setup" class="screen" hidden>
   <header class="bar"><button class="back" data-go="home">←</button><h1>記録の準備</h1></header>
   <main class="pad">
+    <h2 class="first">所属 <small class="muted">（記録の保存先が変わります）</small></h2>
+    <div id="orgChoice" class="seg" role="radiogroup">
+      <button type="button" data-org="rf" role="radio">RF社員</button>
+      <button type="button" data-org="marine" role="radio">マリン社員</button>
+    </div>
     <div class="grid2">
       <label>日付 <input id="metaDate" type="date"></label>
       <label>測定者 <input id="metaMeasurer" type="text" placeholder="例：長谷川"></label>

@@ -41,7 +41,9 @@
     store.set('vm:index', sessionIds().filter((x) => x !== id));
   }
 
-  let settings = store.get('vm:settings', { url: '', pass: '' });
+  // 記録を受け取る GAS の Webアプリ（voice-measure/gas）。所属ごとのフォルダにスプレッドシートを作る
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbzSwDfakMCXdYPFTU2f1qdnmwQdnpmcS4JS33yRVx8imIua1E_06z5kdMQBb4dJfo4/exec';
+  const ORGS = { rf: 'RF社員', marine: 'マリン社員' };
   let session = null;
 
   // ---------- 画面の切り替え ----------
@@ -71,7 +73,7 @@
       const unsent = s.rev !== s.syncedRev;
       return `<li data-id="${esc(s.id)}">
         <div class="title">${esc(titleOf(s))}</div>
-        <div class="muted">${s.rows.length} 尾 ・ ${esc(s.fields.map((f) => f.label).join('・'))}${s.meta.measurer ? ' ・ ' + esc(s.meta.measurer) : ''}</div>
+        <div class="muted">${s.rows.length} 尾 ・ ${esc(s.fields.map((f) => f.label).join('・'))}${s.meta.measurer ? ' ・ ' + esc(s.meta.measurer) : ''}${ORGS[s.meta.org] ? ' ・ ' + ORGS[s.meta.org] : ''}</div>
         <div class="${unsent ? 'warn' : 'muted'}">${unsent ? '未送信の変更があります' : (s.syncedRev ? 'スプレッドシートに送信済み' : '')}</div>
         <div class="acts">
           <button data-act="open" class="primary">続ける</button>
@@ -81,9 +83,6 @@
           <button data-act="del" class="danger">消す</button>
         </div></li>`;
     }).join('');
-    $('setUrl').value = settings.url || '';
-    $('setPass').value = settings.pass || '';
-    if (!settings.url) $('settingsBox').open = true;
   }
 
   $('sessionList').addEventListener('click', async (e) => {
@@ -112,18 +111,20 @@
     }
   });
 
-  $('btnSaveSettings').addEventListener('click', async () => {
-    settings = { url: $('setUrl').value.trim(), pass: $('setPass').value };
-    store.set('vm:settings', settings);
-    const msg = $('settingsMsg');
-    msg.className = 'muted';
-    msg.textContent = '確認中…';
-    const r = await callGas({ action: 'ping' });
-    msg.className = r.ok ? '' : 'warn';
-    msg.textContent = r.ok ? `つながりました（${r.data.spreadsheetName}）` : `つながりません：${r.msg}`;
-  });
-
   $('btnNew').addEventListener('click', () => openSetup());
+
+  // 所属（保存先のフォルダ）。前回選んだものを覚えておく
+  let org = store.get('vm:org', '');
+  function renderOrg() {
+    for (const b of document.querySelectorAll('#orgChoice [data-org]')) b.setAttribute('aria-checked', String(b.dataset.org === org));
+  }
+  $('orgChoice').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-org]');
+    if (!b) return;
+    org = b.dataset.org;
+    store.set('vm:org', org);
+    renderOrg();
+  });
 
   // ---------- 記録の準備（項目選び） ----------
   let setupFields = [];
@@ -144,6 +145,7 @@
       setupFields = C.PRESET_FIELDS.map((p) => ({ field: clone(p), on: p.key === 'sl' || p.key === 'bw' }));
     }
     $('metaDate').value = today();
+    renderOrg();
     renderFieldList();
     go('setup');
   }
@@ -208,7 +210,8 @@
   $('btnStart').addEventListener('click', () => {
     const fields = setupFields.filter((x) => x.on).map((x) => x.field);
     if (!fields.length) return alert('記録する項目を1つ以上選んでください');
-    const meta = { date: $('metaDate').value || today(), name: $('metaName').value.trim(), measurer: $('metaMeasurer').value.trim() };
+    if (!ORGS[org]) return alert('所属（RF社員・マリン社員）を選んでください');
+    const meta = { org, date: $('metaDate').value || today(), name: $('metaName').value.trim(), measurer: $('metaMeasurer').value.trim() };
     const options = { readback: $('optReadback').checked, check: $('optCheck').checked };
     store.set('vm:lastSetup', { fields: setupFields, options, measurer: meta.measurer, name: meta.name });
     const s = C.newSession(meta, fields, options);
@@ -568,14 +571,13 @@
   // ---------- スプレッドシートへの送信 ----------
   // GAS へは text/plain で送る（CORS の事前確認が要らない形）
   async function callGas(body) {
-    if (!settings.url) return { ok: false, msg: '送信先が設定されていません' };
     try {
-      const res = await fetch(settings.url, { method: 'POST', body: JSON.stringify(Object.assign({ password: settings.pass }, body)) });
+      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(body) });
       const data = await res.json();
       if (!data.success) return { ok: false, msg: data.msg || '失敗しました', data };
       return { ok: true, data };
     } catch (e) {
-      return { ok: false, msg: navigator.onLine === false ? 'インターネットにつながっていません' : '送信先に届きません（URLを確認してください）' };
+      return { ok: false, msg: navigator.onLine === false ? 'インターネットにつながっていません' : '送信先に届きません' };
     }
   }
 
@@ -615,7 +617,6 @@
 
   function scheduleSync(delay) {
     clearTimeout(syncTimer);
-    if (!settings.url) return;
     syncTimer = setTimeout(() => { if (session) syncSession(session); }, delay || 4000);
   }
 
@@ -624,8 +625,7 @@
     const el = $('syncState');
     const err = syncError[session.id];
     el.classList.toggle('err', !!err && session.rev !== session.syncedRev);
-    if (!settings.url) el.textContent = '送信先なし（端末に保存）';
-    else if (syncing.has(session.id)) el.textContent = '送信中…';
+    if (syncing.has(session.id)) el.textContent = '送信中…';
     else if (session.rev === session.syncedRev) el.textContent = session.syncedRev ? '✓ 送信済み' : '✓';
     else if (err) el.textContent = '未送信（' + err + '）';
     else el.textContent = '未送信';
