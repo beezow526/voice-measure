@@ -45,6 +45,7 @@
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbzSwDfakMCXdYPFTU2f1qdnmwQdnpmcS4JS33yRVx8imIua1E_06z5kdMQBb4dJfo4/exec';
   const ORGS = { rf: 'RF社員', marine: 'マリン社員' };
   let session = null;
+  let password = store.get('vm:pass', '');
 
   // ---------- 画面の切り替え ----------
   function go(name) {
@@ -110,6 +111,31 @@
       }
     }
   });
+
+  // パスワード：GAS に確かめてもらい、合っていれば端末に覚える
+  $('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = $('btnLogin');
+    btn.disabled = true;
+    $('loginMsg').textContent = '';
+    password = $('loginPass').value;
+    const r = await callGas({ action: 'login' });
+    btn.disabled = false;
+    if (!r.ok) {
+      $('loginMsg').textContent = r.msg;
+      return;
+    }
+    store.set('vm:pass', password);
+    $('loginPass').value = '';
+    go('home');
+  });
+  function requireLogin(msg) {
+    stopListening();
+    password = '';
+    store.remove('vm:pass');
+    $('loginMsg').textContent = msg || '';
+    go('login');
+  }
 
   $('btnNew').addEventListener('click', () => openSetup());
 
@@ -572,9 +598,13 @@
   // GAS へは text/plain で送る（CORS の事前確認が要らない形）
   async function callGas(body) {
     try {
-      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(body) });
+      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(Object.assign({ password }, body)) });
       const data = await res.json();
-      if (!data.success) return { ok: false, msg: data.msg || '失敗しました', data };
+      if (!data.success) {
+        // パスワードが変わったときは入れ直してもらう（記録は端末に残っている）
+        if (data.authError && body.action !== 'login') requireLogin('パスワードを入れ直してください（記録は端末に残っています）');
+        return { ok: false, msg: data.msg || '失敗しました', data };
+      }
       return { ok: true, data };
     } catch (e) {
       return { ok: false, msg: navigator.onLine === false ? 'インターネットにつながっていません' : '送信先に届きません' };
@@ -644,7 +674,7 @@
 
   // ---------- はじめ ----------
   $('srWarn').hidden = !!SR;
-  go('home');
+  go(password ? 'home' : 'login');
   // テストから触れるように
   window.__vm = { runText, handleAlternatives, get session() { return session; } };
 })();

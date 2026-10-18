@@ -9,8 +9,22 @@
 </head>
 <body>
 
+<!-- パスワードの画面（1回通れば、この端末では次から出ない） -->
+<section id="login" class="screen">
+  <header class="bar"><h1>音声計測</h1></header>
+  <main class="pad">
+    <form id="loginForm">
+      <label>パスワード
+        <input id="loginPass" type="password" autocomplete="current-password" required>
+      </label>
+      <button class="big primary" id="btnLogin">次へ</button>
+      <p id="loginMsg" class="warn"></p>
+    </form>
+  </main>
+</section>
+
 <!-- はじめの画面 -->
-<section id="home" class="screen">
+<section id="home" class="screen" hidden>
   <header class="bar"><h1>音声計測</h1></header>
   <main class="pad">
     <button id="btnNew" class="big primary">＋ 新しく記録を始める</button>
