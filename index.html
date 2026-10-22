@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b5e7a">
-  <title>音声計測</title>
+  <title>ギョルバチョフ書記長</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <!-- パスワードの画面（1回通れば、この端末では次から出ない） -->
 <section id="login" class="screen">
-  <header class="bar"><h1>音声計測</h1></header>
+  <header class="bar"><h1>ギョルバチョフ書記長</h1></header>
   <main class="pad">
     <form id="loginForm">
       <label>パスワード
@@ -25,7 +25,7 @@
 
 <!-- はじめの画面 -->
 <section id="home" class="screen" hidden>
-  <header class="bar"><h1>音声計測</h1></header>
+  <header class="bar"><h1>ギョルバチョフ書記長</h1></header>
   <main class="pad">
     <button id="btnNew" class="big primary">＋ 新しく記録を始める</button>
     <h2>これまでの記録</h2>
@@ -73,6 +73,13 @@
 
     <h2>オプション</h2>
     <label class="check"><input id="optReadback" type="checkbox" checked> 1尾ごとに値を読み上げる</label>
+    <div class="voicerow">
+      <label>読み上げの声
+        <select id="optVoice"></select>
+      </label>
+      <button type="button" id="btnVoiceTest">試しに聞く</button>
+    </div>
+    <p id="voiceNote" class="muted small"></p>
     <label class="check"><input id="optCheck" type="checkbox" checked> おかしそうな値（けた違い・体長のわりに重い／軽い）を知らせる</label>
 
     <button id="btnStart" class="big primary">測定を始める</button>
