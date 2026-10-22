@@ -172,7 +172,6 @@
     }
     $('metaDate').value = today();
     renderOrg();
-    renderVoiceSetting();
     renderFieldList();
     go('setup');
   }
@@ -546,7 +545,8 @@
     speaking = true;
     if (rec && running) try { rec.abort(); } catch (e) { /* 何もしない */ }
     const u = new SpeechSynthesisUtterance(text);
-    applyVoice(u);
+    u.lang = 'ja-JP';
+    u.rate = 1.15;
     const finish = () => {
       clearTimeout(speakGuard);
       if (!speaking) return;
@@ -561,78 +561,6 @@
     speechSynthesis.cancel();
     speechSynthesis.speak(u);
   }
-
-  // ---------- 読み上げの声 ----------
-  // 使える声は端末ごとに違う。男・女の声が端末にあればそれを使い、なければ高さと速さで雰囲気を出す
-  const VOICE_STYLES = {
-    standard: { label: '標準', gender: null, pitch: 1, rate: 1.15 },
-    male: { label: '男', gender: 'male', pitch: 0.9, rate: 1.1 },
-    female: { label: '女', gender: 'female', pitch: 1.15, rate: 1.15 },
-    dandy: { label: 'ダンディな男', gender: 'male', pitch: 0.55, rate: 0.9 },
-    sexy: { label: 'セクシーな女', gender: 'female', pitch: 0.9, rate: 0.8 },
-  };
-  // 声の名前から男女を見分ける（iPhone・Windows・Android でよく使われる日本語の声）
-  const MALE_RE = /otoya|hattori|ichiro|keita|daichi|naoki|male(?!.*female)|男性|jac|jad/i;
-  const FEMALE_RE = /kyoko|o-ren|haruka|ayumi|sayaka|nanami|mayu|female|女性|jab|htm/i;
-  let voiceStyle = store.get('vm:voice', 'standard');
-  if (!VOICE_STYLES[voiceStyle]) voiceStyle = 'standard';
-
-  function jaVoices() {
-    if (!('speechSynthesis' in window)) return [];
-    return speechSynthesis.getVoices().filter((v) => /^ja/i.test(v.lang));
-  }
-
-  // 選んだ声の設定 → { voice, pitch, rate, note }
-  function resolveVoice(key) {
-    const st = VOICE_STYLES[key] || VOICE_STYLES.standard;
-    const voices = jaVoices();
-    let voice = null;
-    let pitch = st.pitch;
-    let note = '';
-    if (st.gender) {
-      const re = st.gender === 'male' ? MALE_RE : FEMALE_RE;
-      const other = st.gender === 'male' ? FEMALE_RE : MALE_RE;
-      voice = voices.find((v) => re.test(v.name) && !(st.gender === 'male' && other.test(v.name))) || null;
-      if (!voice) {
-        // その性別の声がない端末：高さで代わりにする
-        const base = voices.find((v) => v.default) || voices[0];
-        const baseIsFemale = !base || !MALE_RE.test(base.name);
-        if (st.gender === 'male' && baseIsFemale) pitch = Math.max(0.1, pitch - 0.35);
-        if (st.gender === 'female' && !baseIsFemale) pitch = Math.min(2, pitch + 0.4);
-        note = `この端末には${st.gender === 'male' ? '男' : '女'}の声がないので、声の高さを変えて近づけています`;
-      }
-    }
-    if (!voices.length) note = 'この端末には日本語の読み上げの声が見つかりません';
-    return { voice, pitch, rate: st.rate, note };
-  }
-
-  function applyVoice(u) {
-    const r = resolveVoice(voiceStyle);
-    u.lang = 'ja-JP';
-    try {
-      if (r.voice) u.voice = r.voice;
-    } catch (e) { /* 声を選べなくても、標準の声で読み上げる */ }
-    u.pitch = r.pitch;
-    u.rate = r.rate;
-  }
-
-  function renderVoiceSetting() {
-    const sel = $('optVoice');
-    sel.innerHTML = Object.keys(VOICE_STYLES).map((k) => `<option value="${k}" ${k === voiceStyle ? 'selected' : ''}>${VOICE_STYLES[k].label}</option>`).join('');
-    const r = resolveVoice(voiceStyle);
-    $('voiceNote').textContent = (r.voice ? `使う声：${r.voice.name}　` : '') + r.note;
-  }
-  $('optVoice').addEventListener('change', (e) => {
-    voiceStyle = e.target.value;
-    store.set('vm:voice', voiceStyle);
-    renderVoiceSetting();
-  });
-  $('btnVoiceTest').addEventListener('click', () => {
-    unlockAudio();
-    speak('同志、記録した。25.3、312');
-  });
-  // 声の一覧はあとから読み込まれることがある
-  if ('speechSynthesis' in window) speechSynthesis.addEventListener('voiceschanged', renderVoiceSetting);
 
   let audioCtx = null;
   function unlockAudio() {

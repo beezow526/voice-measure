@@ -118,9 +118,6 @@ h2.first { margin-top: 0; }
 .controls .mic.on { background: var(--bad); border-color: var(--bad); color: #fff; animation: pulse 1.6s infinite; }
 @keyframes pulse { 50% { opacity: .82; } }
 .hint { font-size: 14px; }
-.small { font-size: 14px; margin: 4px 0 0; }
-.voicerow { display: flex; align-items: flex-end; gap: 10px; }
-.voicerow label { flex: 1; }
 
 .listhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .listhead b { font-size: 26px; }
