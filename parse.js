@@ -61,8 +61,8 @@
   function replaceKanaNumbers(s) {
     return s.replace(/[ぁ-ゖー]+/g, (run) => {
       const k = kanaRunToKanji(run.replace(/ー/g, ''));
-      // 「に」「ご」「し」「よ」「く」1文字だけは助詞などの可能性があるので変えない
-      if (k === null || (run.length === 1 && !/^[〇]$/.test(k))) return run;
+      // 「に」「ご」「し」「よ」「く」1文字だけは助詞などの可能性があるので変えない（それだけを言ったときは数字にする）
+      if (k === null || (run.length === 1 && s.trim() !== run)) return run;
       return k;
     });
   }

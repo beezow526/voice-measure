@@ -5,6 +5,9 @@
   const C = window.VoiceCore;
   const $ = (id) => document.getElementById(id);
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  // Android の Chrome は、連続モードだと「それまでに話した分をつなげた文字」を毎回送ってくる（555 → 555555 → …）。
+  // そのため Android では1回話すごとに聞き取りを区切る
+  const IS_ANDROID = /Android/i.test(navigator.userAgent);
 
   // ---------- 端末への保存（localStorage） ----------
   const store = {
@@ -248,6 +251,11 @@
   // ---------- 測定の画面 ----------
   function openMeasure(s) {
     session = s;
+    // 前回、確定待ちのまま閉じていたら確定しておく
+    if (s.pending) {
+      C.flushPending(s);
+      saveSession(s);
+    }
     $('mTitle').textContent = titleOf(s);
     $('heard').textContent = '—';
     hideBanner();
@@ -364,7 +372,9 @@
   $('btnSyncNow').addEventListener('click', () => syncSession(session).then(renderSync));
   $('btnLeave').addEventListener('click', () => {
     stopListening();
+    clearTimeout(pendingTimer);
     if (session) {
+      if (session.pending) C.flushPending(session);
       saveSession(session);
       if (session.rev !== session.syncedRev) syncSession(session);
     }
@@ -375,7 +385,7 @@
   // ---------- 発話の処理 ----------
   function runText(text) {
     $('heard').textContent = text;
-    handleEvents(C.applyUtterance(session, text));
+    handleEvents(C.applyUtterance(session, text, Date.now()));
   }
 
   // 音声認識の候補（言い方の候補が複数来る）のうち、最初にちゃんと読めたものを使う
@@ -383,7 +393,7 @@
     let chosen = null;
     for (const t of alts) {
       const trial = clone(session);
-      const ev = C.applyUtterance(trial, t);
+      const ev = C.applyUtterance(trial, t, Date.now());
       const ok = !ev.some((x) => x.type === 'error');
       if (ok) { chosen = { trial, ev, t }; break; }
       if (!chosen) chosen = { trial, ev, t };
@@ -394,7 +404,19 @@
     handleEvents(chosen.ev);
   }
 
+  // 確定待ちの魚は、続きの数字が来なければ MERGE_MS 後に確定する
+  let pendingTimer = null;
+  function schedulePending() {
+    clearTimeout(pendingTimer);
+    if (!session || !session.pending) return;
+    const wait = session.lastSet ? Math.max(0, session.lastSet.at + C.MERGE_MS - Date.now()) : 0;
+    pendingTimer = setTimeout(() => {
+      if (session && session.pending) handleEvents(C.flushPending(session));
+    }, wait + 50);
+  }
+
   function handleEvents(events) {
+    schedulePending();
     if (!events.length) return;
     let commitRow = null;
     let error = null;
@@ -467,10 +489,11 @@
     if (!SR || !wantListen || speaking || running) return;
     rec = new SR();
     rec.lang = 'ja-JP';
-    rec.continuous = true;
+    rec.continuous = !IS_ANDROID;
     rec.interimResults = true;
     rec.maxAlternatives = 5;
-    const done = new Set(); // Android の Chrome は同じ結果を何度も返すことがあるので、処理した番号を覚える
+    const done = new Set(); // 同じ結果を何度も返すことがあるので、処理した番号を覚える
+    let prevFinal = '';     // この聞き取りで前に確定した文字（つなげて送られてきたときに、新しい部分だけを取り出す）
     rec.onstart = () => { running = true; renderMic(); };
     rec.onresult = (e) => {
       let interim = '';
@@ -479,8 +502,11 @@
         if (r.isFinal) {
           if (done.has(i)) continue;
           done.add(i);
-          const alts = Array.from(r).map((a) => a.transcript.trim()).filter(Boolean);
-          if (alts.length && session) handleAlternatives(alts);
+          const full = Array.from(r).map((a) => a.transcript.trim()).filter(Boolean);
+          // つなげて送ってくるのは Android だけ。iPhone で同じ数字を続けて言ったときに消さないように、Android のときだけ取り出す
+          const alts = IS_ANDROID ? full.map((t) => newPart(t, prevFinal)).filter(Boolean) : full;
+          if (full.length) prevFinal = full[0];
+          if (alts.length && session && !isRepeat(alts[0])) handleAlternatives(alts);
         } else {
           interim += r[0].transcript;
         }
@@ -511,6 +537,25 @@
     }
   }
 
+  // 前に確定した文字を頭に含んでいたら、その後ろだけを返す（「555」のあとの「555555」→「555」）
+  function newPart(text, prev) {
+    const strip = (x) => x.replace(/\s/g, '');
+    const a = strip(text);
+    const b = strip(prev);
+    if (!b || a === b || !a.startsWith(b)) return a === b ? '' : text;
+    return a.slice(b.length);
+  }
+
+  // 同じ文字が1秒以内に続けて届いたら、二重に届いたものとみなす
+  let lastHeard = { text: '', at: 0 };
+  function isRepeat(text) {
+    const t = text.replace(/\s/g, '');
+    const now = Date.now();
+    const rep = t === lastHeard.text && now - lastHeard.at < 1000;
+    lastHeard = { text: t, at: now };
+    return rep;
+  }
+
   function startListening() {
     wantListen = true;
     unlockAudio();
@@ -527,7 +572,7 @@
   function renderMic() {
     const b = $('btnMic');
     b.classList.toggle('on', wantListen);
-    b.textContent = wantListen ? (running || speaking ? '■ 聞き取り中（押すと止める）' : '■ 準備中…') : '🎤 聞き取り開始';
+    b.textContent = wantListen ? '■ 聞き取り中（押すと止める）' : '🎤 聞き取り開始';
   }
   $('btnMic').addEventListener('click', () => (wantListen ? stopListening() : startListening()));
   // 画面を戻ってきたとき、画面ロックを取り直す

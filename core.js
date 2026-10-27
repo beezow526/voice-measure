@@ -24,7 +24,9 @@
 
   const MIN_ROWS_FOR_CHECK = 5;  // これより少ないうちは外れ値を調べない
   const VALUE_RATIO = 2.5;       // 中央値の 2.5 倍より大きい・1/2.5 より小さい値は要確認
-  const K_RATIO = 1.35;          // 肥満度（体重 / 長さ^3）が中央値の 1.35 倍・1/1.35 を超えたら要確認
+  const K_RATIO = 1.35;
+  const MERGE_MS = 1500;         // 値が入ってからこの時間内に届いた続き（「300」→「12」、「25」→「点3」）は1つの数字にまとめる
+  const MAX_NUMBER = 1e6;        // これ以上の数値は、聞き取りの重なりとみなして入れない          // 肥満度（体重 / 長さ^3）が中央値の 1.35 倍・1/1.35 を超えたら要確認
 
   function newSession(meta, fields, options) {
     return {
@@ -35,6 +37,8 @@
       options: Object.assign({ readback: true, check: true }, options),
       rows: [],
       current: emptyFish(1),
+      pending: false,  // 全部の項目が埋まり、確定を待っている（続きの数字が来るかもしれないので少し待つ）
+      lastSet: null,   // 声で最後に入れた値 { no, key, at }（続きをまとめるのに使う）
       rev: 0,
       syncedRev: 0,
       finished: false,
@@ -105,13 +109,57 @@
     const cur = session.current;
     cur.values[key] = value;
     cur.order = cur.order.filter((k) => k !== key).concat(key);
+    session.lastSet = nowMs === null ? null : { no: cur.no, key, at: nowMs };
     touch(session);
   }
 
-  // 全部の項目が埋まったら1尾分として確定し、次の魚に進む
+  // 全部の項目が埋まったら1尾分として確定し、次の魚に進む。
+  // 声で入れたとき（時刻あり）は、すぐには確定せず「確定待ち」にする（話の途中の間で数字が分かれることがあるため）
   function commitIfComplete(session, events) {
     if (nextField(session)) return;
-    commit(session, events);
+    if (nowMs === null) {
+      commit(session, events);
+    } else {
+      session.pending = true;
+      events.push({ type: 'pending', no: session.current.no });
+    }
+  }
+
+  // 確定待ちの魚を確定する（画面が MERGE_MS 待ってから呼ぶ）
+  function flushPending(session) {
+    const events = [];
+    if (session.pending) commit(session, events);
+    return events;
+  }
+
+  // 直前の数値の続きなら、つなげた数値を返す（例：300 と「12」→ 312、25 と「点3」→ 25.3）
+  function mergeNumber(prev, raw) {
+    if (typeof prev !== 'number' || !Number.isInteger(prev) || prev <= 0) return null;
+    const s = P.normalize(raw).replace(/\s/g, '');
+    const dec = s.match(/^(?:点|てん|\.)(.+)$/);
+    const tokens = P.tokenize(dec ? dec[1] : raw);
+    if (tokens.length !== 1 || tokens[0].type !== 'num' || !/^\d+$/.test(tokens[0].text)) return null;
+    if (dec) return Number(`${prev}.${tokens[0].text}`);
+    const n = tokens[0].value;
+    let zeros = 0;
+    for (let x = prev; x % 10 === 0; x /= 10) zeros++;
+    return n > 0 && n < Math.pow(10, zeros) ? prev + n : null;
+  }
+
+  function tryMerge(session, raw, events) {
+    const last = session.lastSet;
+    const cur = session.current;
+    if (nowMs === null || !last || nowMs - last.at > MERGE_MS) return false;
+    if (last.no !== cur.no || cur.order[cur.order.length - 1] !== last.key) return false;
+    const field = session.fields.find((f) => f.key === last.key);
+    if (!field || field.type !== 'number') return false;
+    const v = mergeNumber(cur.values[last.key], raw);
+    if (v === null) return false;
+    cur.values[last.key] = v;
+    last.at = nowMs;
+    touch(session);
+    events.push({ type: 'set', key: field.key, label: field.label, value: v, merged: true });
+    return true;
   }
 
   function commit(session, events) {
@@ -127,6 +175,8 @@
     row.flags = checkRow(session, row);
     session.rows.push(row);
     session.current = emptyFish(nextNo(session));
+    session.pending = false;
+    session.lastSet = null;
     touch(session);
     events.push({ type: 'commit', row });
   }
@@ -142,7 +192,9 @@
       while (j < tokens.length && tokens[j].type !== 'num') j++;
       if (j >= tokens.length) return null;
       const t = tokens[j];
-      return { value: P.convertUnit(t.value, t.unit, field.unit), next: j + 1 };
+      const value = P.convertUnit(t.value, t.unit, field.unit);
+      if (value >= MAX_NUMBER) return null;
+      return { value, next: j + 1 };
     }
     if (field.type === 'choice') {
       const t = tokens[i];
@@ -185,6 +237,8 @@
   }
 
   function undo(session, events) {
+    session.pending = false;
+    session.lastSet = null;
     let cur = session.current;
     if (!cur.order.length && !cur.memo && session.rows.length) {
       const row = session.rows.pop();
@@ -214,11 +268,26 @@
     events.push({ type: 'undo', key, label: field ? field.label : key, no: cur.no });
   }
 
-  // 1回の発話を処理する。戻り値は画面に知らせる出来事の一覧
-  function applyUtterance(session, text) {
+  let nowMs = null;
+
+  // 1回の発話を処理する。戻り値は画面に知らせる出来事の一覧。
+  // now（ミリ秒）を渡すと声の入力として扱い、間で分かれた数字をまとめ、全部そろっても確定待ちにする（画面が flushPending で確定する）
+  function applyUtterance(session, text, now) {
+    nowMs = typeof now === 'number' ? now : null;
+    try {
+      return applyUtteranceImpl(session, text);
+    } finally {
+      nowMs = null;
+    }
+  }
+
+  function applyUtteranceImpl(session, text) {
     const events = [];
     const raw = String(text || '').trim();
     if (!raw) return events;
+
+    // 直前の数値の続きなら、つなげる
+    if (tryMerge(session, raw, events)) return events;
 
     const memo = P.parseMemo(raw);
     if (memo !== null) {
@@ -234,6 +303,8 @@
       undo(session, events);
       return events;
     }
+    // 確定待ちのところに次の発話が来たら、先に確定してから処理する
+    if (session.pending) commit(session, events);
     if (cmd === 'skip') {
       const f = nextField(session);
       if (f) {
@@ -311,6 +382,7 @@
   // 「この魚を確定」ボタン。何か入っていれば、残りは空欄で確定する
   function commitCurrent(session) {
     const events = [];
+    session.pending = false;
     if (session.current.order.length || session.current.memo) commit(session, events);
     return events;
   }
@@ -361,7 +433,7 @@
   }
 
   const api = {
-    PRESET_FIELDS, newSession, applyUtterance, nextField, setCurrentValue, commitCurrent,
+    PRESET_FIELDS, MERGE_MS, newSession, applyUtterance, flushPending, nextField, setCurrentValue, commitCurrent,
     updateRow, deleteRow, checkRow, toTable, toCsv,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
