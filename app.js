@@ -444,7 +444,8 @@
       showBanner(`No.${commitRow.no} 記録しました`, 'ok');
       if (session.options.readback) {
         const vals = session.fields.map((f) => commitRow.values[f.key]).filter((v) => v !== '' && v !== undefined);
-        speak(vals.join('、'));
+        // 「、」でつなぐと、Android の読み上げは 105、25、27、22 を1つの数字（何兆…）として読んでしまうので「。」で区切る
+        speak(vals.join('。 '));
       }
     } else if (last.type === 'undo') {
       beep('bad');
