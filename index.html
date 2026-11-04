@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b5e7a">
   <title>ギョルバチョフ書記長</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2026-11-04b">
 </head>
 <body>
 
@@ -32,6 +32,7 @@
     <p id="noSessions" class="muted">まだありません</p>
     <ul id="sessionList" class="cards"></ul>
 
+    <p id="appVersion" class="muted small"></p>
     <p id="srWarn" class="warn" hidden>この端末のブラウザは音声認識に対応していません。Android は Chrome、iPhone / iPad は Safari で開いてください。</p>
   </main>
 </section>
@@ -84,6 +85,7 @@
   <header class="bar">
     <button class="back" id="btnLeave">←</button>
     <h1 id="mTitle"></h1>
+    <span id="awakeState" class="sync" hidden>☀ 画面ON</span>
     <span id="syncState" class="sync"></span>
   </header>
   <main class="measure">
@@ -125,8 +127,9 @@
   </form>
 </dialog>
 
-<script src="parse.js"></script>
-<script src="core.js"></script>
-<script src="app.js"></script>
+<script src="nosleep-media.js?v=2026-11-04b"></script>
+<script src="parse.js?v=2026-11-04b"></script>
+<script src="core.js?v=2026-11-04b"></script>
+<script src="app.js?v=2026-11-04b"></script>
 </body>
 </html>

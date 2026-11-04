@@ -3,6 +3,8 @@
   'use strict';
 
   const C = window.VoiceCore;
+  // 画面に出す版の番号（端末で新しい版が動いているかを見分けるため）。index.html の app.js?v=… から取る
+  const APP_VERSION = (String((document.currentScript || {}).src || '').match(/[?&]v=([^&]+)/) || [])[1] || '';
   const $ = (id) => document.getElementById(id);
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   // Android の Chrome は、連続モードだと「それまでに話した分をつなげた文字」を毎回送ってくる（555 → 555555 → …）。
@@ -577,44 +579,92 @@
   $('btnMic').addEventListener('click', () => (wantListen ? stopListening() : startListening()));
 
   // ---------- 画面を消さない ----------
-  // 測定画面を開いているあいだは、聞き取りを止めていても画面が暗くならないようにする（Screen Wake Lock）。
-  // 別のアプリに切り替えたときなどに端末が勝手に外すので、外れたら取り直す
+  // 測定画面を開いているあいだは、聞き取りを止めていても画面が暗くならないようにする。
+  // 1. ブラウザの Screen Wake Lock を使う（端末が勝手に外したら取り直す）
+  // 2. それが使えない・失敗したときは、見えない無音の動画を流し続ける（動画の再生中は画面が消えない）
+  //    iPhone で「ホーム画面に追加」して開いたときは、Wake Lock が効かないことがある（iOS 18.4 より前）ので、こちらを使う
+  const IOS_HOME_APP = window.navigator.standalone === true;
   let wakeLock = null;
   let wantAwake = false;
+  let awakeVideo = null;
+
   async function keepAwake() {
     wantAwake = true;
-    if (!('wakeLock' in navigator)) {
-      showAwakeNote('この端末のブラウザは、画面が消えないようにする機能に対応していません。端末の設定で、画面の自動ロック（スリープ）までの時間を長くしてください');
-      return;
-    }
-    if (wakeLock || document.visibilityState !== 'visible') return;
-    try {
-      wakeLock = await navigator.wakeLock.request('screen');
-      showAwakeNote('');
-      wakeLock.addEventListener('release', () => {
+    if (document.visibilityState !== 'visible') return;
+    if ('wakeLock' in navigator && !IOS_HOME_APP) {
+      if (wakeLock) return renderAwake('lock');
+      try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => {
+          wakeLock = null;
+          renderAwake('');
+          if (wantAwake && document.visibilityState === 'visible') setTimeout(keepAwake, 500);
+        });
+        if (awakeVideo) awakeVideo.pause();
+        return renderAwake('lock');
+      } catch (e) {
         wakeLock = null;
-        if (wantAwake && document.visibilityState === 'visible') setTimeout(keepAwake, 500);
-      });
-    } catch (e) {
-      wakeLock = null;
-      showAwakeNote('画面が消えないようにできませんでした（省電力モードでは使えないことがあります）。画面をタップすると、もう一度試します');
+      }
     }
+    renderAwake((await playAwakeVideo()) ? 'video' : 'fail');
   }
+
+  function playAwakeVideo() {
+    const media = window.NOSLEEP_MEDIA;
+    if (!media) return Promise.resolve(false);
+    if (!awakeVideo) {
+      const v = document.createElement('video');
+      v.muted = true; // 音を出さない（マイクや読み上げとぶつからないように）
+      v.setAttribute('muted', '');
+      v.setAttribute('playsinline', '');
+      v.setAttribute('aria-hidden', 'true');
+      v.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;pointer-events:none;';
+      for (const [type, src] of [['webm', media.webm], ['mp4', media.mp4]]) {
+        const el = document.createElement('source');
+        el.src = src;
+        el.type = 'video/' + type;
+        v.appendChild(el);
+      }
+      // webm は短いのでくり返す。mp4 は最後まで行かないように途中へ戻す（NoSleep.js と同じやり方）
+      v.addEventListener('loadedmetadata', () => {
+        if (v.duration <= 1) v.loop = true;
+        else v.addEventListener('timeupdate', () => { if (v.currentTime > 0.5) v.currentTime = Math.random(); });
+      });
+      document.body.appendChild(v);
+      awakeVideo = v;
+    }
+    const pr = awakeVideo.play();
+    return (pr && pr.then ? pr : Promise.resolve()).then(() => true).catch(() => false);
+  }
+
   function allowSleep() {
     wantAwake = false;
     if (wakeLock) wakeLock.release().catch(() => {});
     wakeLock = null;
-    showAwakeNote('');
+    if (awakeVideo) awakeVideo.pause();
+    renderAwake('');
   }
-  function showAwakeNote(text) {
-    $('awakeNote').textContent = text;
-    $('awakeNote').hidden = !text;
+
+  // 右上に「☀ 画面ON」を出す。できなかったときは測定画面に注意を出す
+  let awakeMode = '';
+  function renderAwake(mode) {
+    awakeMode = mode;
+    $('awakeState').hidden = !(mode === 'lock' || mode === 'video');
+    $('awakeState').title = mode === 'video' ? '画面ON（動画で維持）' : '画面ON';
+    const note = mode === 'fail'
+      ? '画面が暗くならないようにできませんでした（省電力モードでは使えないことがあります）。画面をタップすると、もう一度試します。直らなければ、端末の設定で自動ロックまでの時間を長くしてください'
+      : '';
+    $('awakeNote').textContent = note;
+    $('awakeNote').hidden = !note;
   }
+
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && wantAwake) keepAwake();
   });
-  // うまくいかなかったときは、画面に触ったときに取り直す
-  $('measure').addEventListener('pointerdown', () => { if (wantAwake && !wakeLock) keepAwake(); });
+  // うまくいっていないときは、画面に触ったときに取り直す（動画の再生は、画面に触ったときのほうが通りやすい）
+  $('measure').addEventListener('pointerdown', () => {
+    if (wantAwake && (awakeMode === 'fail' || awakeMode === '' || (awakeMode === 'video' && awakeVideo && awakeVideo.paused))) keepAwake();
+  });
 
   // ---------- 読み上げと音 ----------
   // 読み上げ中は認識を止める（自分の声を数字として拾わないように）
@@ -753,6 +803,7 @@
 
   // ---------- はじめ ----------
   $('srWarn').hidden = !!SR;
+  $('appVersion').textContent = APP_VERSION ? '版 ' + APP_VERSION : '';
   go(password ? 'home' : 'login');
   // テストから触れるように
   window.__vm = { runText, handleAlternatives, get session() { return session; } };
