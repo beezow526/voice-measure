@@ -261,6 +261,7 @@
     hideBanner();
     renderAll();
     go('measure');
+    keepAwake();
     if (!SR) showBanner('このブラウザでは音声認識が使えません。手入力はできます（Android は Chrome、iPhone は Safari）', 'bad');
   }
 
@@ -372,6 +373,7 @@
   $('btnSyncNow').addEventListener('click', () => syncSession(session).then(renderSync));
   $('btnLeave').addEventListener('click', () => {
     stopListening();
+    allowSleep();
     clearTimeout(pendingTimer);
     if (session) {
       if (session.pending) C.flushPending(session);
@@ -456,12 +458,7 @@
       showBanner(`No.${last.no} にメモ：${last.memo}`, 'ok');
     } else {
       beep('ok');
-      // 入った値を表示しておく（次の表示に変わるまで消さない）
-      const set = events.filter((x) => x.type === 'set').pop();
-      if (set) {
-        const v = set.value === '' ? '（空欄）' : set.value;
-        showBanner(`No.${session.current.no} ${set.label}：${v}${session.pending ? '（まもなく確定）' : ''}`, 'ok');
-      }
+      hideBanner();
     }
   }
 
@@ -471,12 +468,14 @@
     renderSync();
   }
 
-  // お知らせは、次のお知らせに変わるまで出したままにする
+  let bannerTimer = null;
   function showBanner(text, kind) {
     const b = $('banner');
     b.textContent = text;
     b.className = 'banner ' + kind;
     b.hidden = false;
+    clearTimeout(bannerTimer);
+    if (kind === 'ok') bannerTimer = setTimeout(hideBanner, 3000);
   }
   function hideBanner() {
     $('banner').hidden = true;
@@ -487,7 +486,6 @@
   let wantListen = false;
   let running = false;
   let speaking = false;
-  let wakeLock = null;
 
   function startRec() {
     if (!SR || !wantListen || speaking || running) return;
@@ -565,13 +563,11 @@
     unlockAudio();
     startRec();
     renderMic();
-    if ('wakeLock' in navigator) navigator.wakeLock.request('screen').then((w) => { wakeLock = w; }).catch(() => {});
   }
   function stopListening() {
     wantListen = false;
     if (rec) try { rec.abort(); } catch (e) { /* 何もしない */ }
     renderMic();
-    if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
   }
   function renderMic() {
     const b = $('btnMic');
@@ -579,12 +575,46 @@
     b.textContent = wantListen ? '■ 聞き取り中（押すと止める）' : '🎤 聞き取り開始';
   }
   $('btnMic').addEventListener('click', () => (wantListen ? stopListening() : startListening()));
-  // 画面を戻ってきたとき、画面ロックを取り直す
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && wantListen && 'wakeLock' in navigator) {
-      navigator.wakeLock.request('screen').then((w) => { wakeLock = w; }).catch(() => {});
+
+  // ---------- 画面を消さない ----------
+  // 測定画面を開いているあいだは、聞き取りを止めていても画面が暗くならないようにする（Screen Wake Lock）。
+  // 別のアプリに切り替えたときなどに端末が勝手に外すので、外れたら取り直す
+  let wakeLock = null;
+  let wantAwake = false;
+  async function keepAwake() {
+    wantAwake = true;
+    if (!('wakeLock' in navigator)) {
+      showAwakeNote('この端末のブラウザは、画面が消えないようにする機能に対応していません。端末の設定で、画面の自動ロック（スリープ）までの時間を長くしてください');
+      return;
     }
+    if (wakeLock || document.visibilityState !== 'visible') return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      showAwakeNote('');
+      wakeLock.addEventListener('release', () => {
+        wakeLock = null;
+        if (wantAwake && document.visibilityState === 'visible') setTimeout(keepAwake, 500);
+      });
+    } catch (e) {
+      wakeLock = null;
+      showAwakeNote('画面が消えないようにできませんでした（省電力モードでは使えないことがあります）。画面をタップすると、もう一度試します');
+    }
+  }
+  function allowSleep() {
+    wantAwake = false;
+    if (wakeLock) wakeLock.release().catch(() => {});
+    wakeLock = null;
+    showAwakeNote('');
+  }
+  function showAwakeNote(text) {
+    $('awakeNote').textContent = text;
+    $('awakeNote').hidden = !text;
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && wantAwake) keepAwake();
   });
+  // うまくいかなかったときは、画面に触ったときに取り直す
+  $('measure').addEventListener('pointerdown', () => { if (wantAwake && !wakeLock) keepAwake(); });
 
   // ---------- 読み上げと音 ----------
   // 読み上げ中は認識を止める（自分の声を数字として拾わないように）
