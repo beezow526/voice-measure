@@ -456,7 +456,12 @@
       showBanner(`No.${last.no} にメモ：${last.memo}`, 'ok');
     } else {
       beep('ok');
-      hideBanner();
+      // 入った値を表示しておく（次の表示に変わるまで消さない）
+      const set = events.filter((x) => x.type === 'set').pop();
+      if (set) {
+        const v = set.value === '' ? '（空欄）' : set.value;
+        showBanner(`No.${session.current.no} ${set.label}：${v}${session.pending ? '（まもなく確定）' : ''}`, 'ok');
+      }
     }
   }
 
@@ -466,14 +471,12 @@
     renderSync();
   }
 
-  let bannerTimer = null;
+  // お知らせは、次のお知らせに変わるまで出したままにする
   function showBanner(text, kind) {
     const b = $('banner');
     b.textContent = text;
     b.className = 'banner ' + kind;
     b.hidden = false;
-    clearTimeout(bannerTimer);
-    if (kind === 'ok') bannerTimer = setTimeout(hideBanner, 3000);
   }
   function hideBanner() {
     $('banner').hidden = true;

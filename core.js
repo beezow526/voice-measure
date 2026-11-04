@@ -410,10 +410,18 @@
     const head = ['日付', '記録名', '測定者', 'No']
       .concat(session.fields.map((f) => (f.unit ? `${f.label}(${f.unit})` : f.label)))
       .concat(['メモ', '要確認', '記録時刻']);
-    const rows = session.rows.slice().sort((a, b) => a.no - b.no).map((r) => [session.meta.date, session.meta.name, session.meta.measurer, r.no]
+    // 日付は、その魚を記録した日（記録の準備で入れた日付ではない。日をまたいで続けたときも実際の日になる）
+    const rows = session.rows.slice().sort((a, b) => a.no - b.no).map((r) => [formatDate(r.time) || session.meta.date, session.meta.name, session.meta.measurer, r.no]
       .concat(session.fields.map((f) => (r.values[f.key] === undefined ? '' : r.values[f.key])))
       .concat([r.memo || '', (r.flags || []).join(' '), formatTime(r.time)]));
     return { head, rows };
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }
 
   function formatTime(iso) {
