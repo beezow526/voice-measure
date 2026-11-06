@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b5e7a">
   <title>ギョルバチョフ書記長</title>
-  <link rel="stylesheet" href="style.css?v=2026-11-06b">
+  <link rel="stylesheet" href="style.css?v=2026-11-06c">
 </head>
 <body>
 
@@ -135,6 +135,19 @@
     </details>
 
     <details class="box">
+      <summary>6. 記録の保存先</summary>
+      <ul>
+        <li><b>所属ごとの Google ドライブのフォルダ</b>に保存されます。記録の準備で「RF社員」を選べば RF社員のフォルダ、「マリン社員」を選べばマリン社員のフォルダです。所属を間違えると、別のフォルダに入るので気をつけてください</li>
+        <li><b>記録1つにつき、スプレッドシートが1つ</b>できます。名前は「<b>日付_記録名_測定者</b>」です（例：2026-11-06_中棟1 ヒラメ_長谷川）</li>
+        <li>中の「<b>記録</b>」シートに、<b>1尾が1行</b>で入ります。列は、日付・記録名・測定者・No・選んだ項目（単位つき）・メモ・要確認・記録時刻です。日付はその魚を記録した日です</li>
+        <li>「続ける」で続きを測ると、<b>同じファイル</b>に書き足されます。アプリで直した値や消した行も、そのままファイルに反映されます</li>
+        <li>ファイルは、そのフォルダを共有されている人が見られます。はじめの画面の「<b>シートを開く</b>」からも開けます</li>
+      </ul>
+      <p class="warn small">⚠ スプレッドシートを手で直しても、そのあとアプリから送ると、アプリの内容で書き直されます。値を直すときはアプリで直すか、測り終わってから（もうアプリで続けない記録で）直してください。</p>
+      <p class="muted">記録は、送る前にまず<b>この端末の中</b>にも保存されます。ブラウザの履歴やWebサイトのデータを消すと、端末の中の記録は消えます（送信済みの分はスプレッドシートに残ります）。念のため控えがほしいときは「CSV保存」で端末にファイルとして保存できます。</p>
+    </details>
+
+    <details class="box">
       <summary>うまくいかないとき</summary>
       <dl>
         <dt>声が入らない・🎤 を押しても反応しない</dt>
@@ -246,9 +259,9 @@
   </form>
 </dialog>
 
-<script src="nosleep-media.js?v=2026-11-06b"></script>
-<script src="parse.js?v=2026-11-06b"></script>
-<script src="core.js?v=2026-11-06b"></script>
-<script src="app.js?v=2026-11-06b"></script>
+<script src="nosleep-media.js?v=2026-11-06c"></script>
+<script src="parse.js?v=2026-11-06c"></script>
+<script src="core.js?v=2026-11-06c"></script>
+<script src="app.js?v=2026-11-06c"></script>
 </body>
 </html>
