@@ -583,30 +583,56 @@
   // 1. ブラウザの Screen Wake Lock を使う（端末が勝手に外したら取り直す）
   // 2. それが使えない・失敗したときは、見えない無音の動画を流し続ける（動画の再生中は画面が消えない）
   //    iPhone で「ホーム画面に追加」して開いたときは、Wake Lock が効かないことがある（iOS 18.4 より前）ので、こちらを使う
+  // 3. iPhone・iPad は、Wake Lock が「取れた」と返しても実際には暗くなる・黙って外れることがあるので、
+  //    Wake Lock と動画を両方使い、10秒ごとに点検して、外れていたら取り直す
   const IOS_HOME_APP = window.navigator.standalone === true;
+  const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
   let wakeLock = null;
   let wantAwake = false;
   let awakeVideo = null;
+  let awakeTimer = null;
 
   async function keepAwake() {
     wantAwake = true;
+    if (!awakeTimer) awakeTimer = setInterval(checkAwake, 10000);
     if (document.visibilityState !== 'visible') return;
+    let locked = false;
     if ('wakeLock' in navigator && !IOS_HOME_APP) {
-      if (wakeLock) return renderAwake('lock');
-      try {
-        wakeLock = await navigator.wakeLock.request('screen');
-        wakeLock.addEventListener('release', () => {
+      if (wakeLock && !wakeLock.released) {
+        locked = true;
+      } else {
+        try {
+          const lock = await navigator.wakeLock.request('screen');
+          wakeLock = lock;
+          lock.addEventListener('release', () => {
+            if (wakeLock === lock) wakeLock = null;
+            if (wantAwake && document.visibilityState === 'visible') setTimeout(keepAwake, 500);
+          });
+          locked = true;
+        } catch (e) {
           wakeLock = null;
-          renderAwake('');
-          if (wantAwake && document.visibilityState === 'visible') setTimeout(keepAwake, 500);
-        });
-        if (awakeVideo) awakeVideo.pause();
-        return renderAwake('lock');
-      } catch (e) {
-        wakeLock = null;
+        }
       }
     }
-    renderAwake((await playAwakeVideo()) ? 'video' : 'fail');
+    if (locked && !IS_IOS) {
+      if (awakeVideo) awakeVideo.pause();
+      return renderAwake('lock');
+    }
+    const playing = await playAwakeVideo();
+    renderAwake(locked && playing ? 'both' : locked ? 'lock' : playing ? 'video' : 'fail');
+  }
+
+  // 10秒ごとに、Wake Lock が外れていないか・動画が止まっていないかを見て、取り直す
+  function checkAwake() {
+    if (!wantAwake) {
+      clearInterval(awakeTimer);
+      awakeTimer = null;
+      return;
+    }
+    if (document.visibilityState !== 'visible') return;
+    const lockLost = 'wakeLock' in navigator && !IOS_HOME_APP && (!wakeLock || wakeLock.released);
+    const videoStopped = (IS_IOS || awakeMode === 'video') && (!awakeVideo || awakeVideo.paused);
+    if (lockLost || videoStopped || awakeMode === 'fail') keepAwake();
   }
 
   function playAwakeVideo() {
@@ -630,6 +656,12 @@
         if (v.duration <= 1) v.loop = true;
         else v.addEventListener('timeupdate', () => { if (v.currentTime > 0.5) v.currentTime = Math.random(); });
       });
+      // 音声認識や読み上げで iPhone が動画を止めることがあるので、止まったら流し直す
+      v.addEventListener('pause', () => {
+        if (wantAwake && document.visibilityState === 'visible' && (IS_IOS || awakeMode === 'video')) {
+          setTimeout(() => { if (wantAwake && v.paused) v.play().catch(() => {}); }, 300);
+        }
+      });
       document.body.appendChild(v);
       awakeVideo = v;
     }
@@ -639,6 +671,8 @@
 
   function allowSleep() {
     wantAwake = false;
+    if (awakeTimer) clearInterval(awakeTimer);
+    awakeTimer = null;
     if (wakeLock) wakeLock.release().catch(() => {});
     wakeLock = null;
     if (awakeVideo) awakeVideo.pause();
@@ -649,8 +683,10 @@
   let awakeMode = '';
   function renderAwake(mode) {
     awakeMode = mode;
-    $('awakeState').hidden = !(mode === 'lock' || mode === 'video');
-    $('awakeState').title = mode === 'video' ? '画面ON（動画で維持）' : '画面ON';
+    // どの方法で保っているかも出す（L = Wake Lock、V = 動画）。iPhone で暗くなったときに、どちらが効いていないか見分けるため
+    const label = { lock: '☀ 画面ON L', video: '☀ 画面ON V', both: '☀ 画面ON LV' }[mode];
+    $('awakeState').hidden = !label;
+    if (label) $('awakeState').textContent = label;
     const note = mode === 'fail'
       ? '画面が暗くならないようにできませんでした（省電力モードでは使えないことがあります）。画面をタップすると、もう一度試します。直らなければ、端末の設定で自動ロックまでの時間を長くしてください'
       : '';
@@ -663,7 +699,7 @@
   });
   // うまくいっていないときは、画面に触ったときに取り直す（動画の再生は、画面に触ったときのほうが通りやすい）
   $('measure').addEventListener('pointerdown', () => {
-    if (wantAwake && (awakeMode === 'fail' || awakeMode === '' || (awakeMode === 'video' && awakeVideo && awakeVideo.paused))) keepAwake();
+    if (wantAwake && (awakeMode === 'fail' || awakeMode === '' || (awakeMode === 'lock' && IS_IOS) || ((IS_IOS || awakeMode === 'video') && awakeVideo && awakeVideo.paused))) keepAwake();
   });
 
   // ---------- 読み上げと音 ----------
