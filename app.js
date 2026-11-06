@@ -60,6 +60,28 @@
   }
   for (const b of document.querySelectorAll('[data-go]')) b.addEventListener('click', () => go(b.dataset.go));
 
+  // ---------- 使い方 ----------
+  // はじめて開いた端末では自動で出す（1回見たら次からは出さない）。はじめの画面・記録の準備の画面のボタンからも開ける
+  let helpFrom = 'home';
+  function openHelp() {
+    const cur = document.querySelector('.screen:not([hidden])');
+    helpFrom = cur && cur.id !== 'help' ? cur.id : 'home';
+    go('help');
+  }
+  function closeHelp() {
+    store.set('vm:helpSeen', true);
+    go(helpFrom);
+  }
+  for (const b of document.querySelectorAll('[data-help]')) b.addEventListener('click', openHelp);
+  $('helpBack').addEventListener('click', closeHelp);
+  $('helpDone').addEventListener('click', closeHelp);
+  // はじめての人なら使い方、そうでなければ指定の画面へ
+  function goFirst(name) {
+    if (store.get('vm:helpSeen', false)) return go(name);
+    go(name);
+    openHelp();
+  }
+
   function esc(s) {
     return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
@@ -132,7 +154,7 @@
     }
     store.set('vm:pass', password);
     $('loginPass').value = '';
-    go('home');
+    goFirst('home');
   });
   function requireLogin(msg) {
     stopListening();
@@ -840,7 +862,8 @@
   // ---------- はじめ ----------
   $('srWarn').hidden = !!SR;
   $('appVersion').textContent = APP_VERSION ? '版 ' + APP_VERSION : '';
-  go(password ? 'home' : 'login');
+  if (password) goFirst('home');
+  else go('login');
   // テストから触れるように
   window.__vm = { runText, handleAlternatives, get session() { return session; } };
 })();

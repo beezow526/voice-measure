@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b5e7a">
   <title>ギョルバチョフ書記長</title>
-  <link rel="stylesheet" href="style.css?v=2026-11-06a">
+  <link rel="stylesheet" href="style.css?v=2026-11-06b">
 </head>
 <body>
 
@@ -28,6 +28,7 @@
   <header class="bar"><h1>ギョルバチョフ書記長</h1></header>
   <main class="pad">
     <button id="btnNew" class="big primary">＋ 新しく記録を始める</button>
+    <button class="big" data-help>📖 使い方</button>
     <h2>これまでの記録</h2>
     <p id="noSessions" class="muted">まだありません</p>
     <ul id="sessionList" class="cards"></ul>
@@ -37,9 +38,127 @@
   </main>
 </section>
 
+<!-- 使い方（はじめて開いたときに自動で出る。はじめの画面・記録の準備の画面からも開ける） -->
+<section id="help" class="screen" hidden>
+  <header class="bar"><button class="back" id="helpBack">←</button><h1>使い方</h1></header>
+  <main class="pad help">
+    <p class="lead">魚の体長・体重などを<b>声で言うだけで記録</b>できるアプリです。言った数字は画面に大きく出て、Google ドライブのスプレッドシートに保存されます。記録係がいなくても、1人で測定できます。</p>
+
+    <div class="steps">
+      <div class="step"><span class="num">1</span><div><b>記録の準備</b><br>所属・測定者・記録名を入れ、記録する項目を選ぶ</div></div>
+      <div class="step"><span class="num">2</span><div><b>🎤 を押して話す</b><br>「にじゅうごてんさん」「さんびゃくじゅうに」と数字を言う</div></div>
+      <div class="step"><span class="num">3</span><div><b>自動で保存</b><br>1尾ごとにピッと鳴る。スプレッドシートに自動で送られる</div></div>
+    </div>
+
+    <details class="box" open>
+      <summary>測る前に確かめること</summary>
+      <ul>
+        <li><b>ブラウザ</b>：Android は <b>Chrome</b>、iPhone・iPad は <b>Safari</b> で開く（iPhone の Chrome では音声認識が使えないことがあります）</li>
+        <li><b>インターネット</b>：音声認識に必要です。電波が切れても記録は端末に残り、つながったときに送られます</li>
+        <li><b>省電力モードを切る</b>：省電力モード（iPhone はバッテリーが黄色）のままだと、画面が暗くなってしまいます。電池が少ないときは充電しながら使ってください</li>
+        <li><b>マイク</b>：ポンプやブロワーの音があると聞き取りにくくなります。口元に近いマイク（Bluetooth のヘッドセットなど）があると、かなり良くなります</li>
+        <li><b>置き場所</b>：タブレットは防水ケースに入れ、測る人から見える位置に置きます</li>
+      </ul>
+    </details>
+
+    <details class="box">
+      <summary>1. 記録の準備をする</summary>
+      <ol>
+        <li>はじめの画面で「<b>＋ 新しく記録を始める</b>」を押す</li>
+        <li><b>所属</b>（RF社員・マリン社員）を選ぶ。記録はその所属のフォルダに保存されます</li>
+        <li><b>日付・測定者・記録名</b>（水槽・ロットなど）を入れる。スプレッドシートの名前は「日付_記録名_測定者」になります</li>
+        <li><b>記録する項目</b>にチェックを付け、<b>話す順番</b>に ↑↓ で並べる（例：体長 → 体重）
+          <ul>
+            <li>用意してある項目：識別番号・性別・全長・体長・尾叉長・体重。長さは cm / mm、重さは g / kg を選べます</li>
+            <li>ほかの項目は「＋ 項目を追加する」で作れます</li>
+          </ul>
+        </li>
+        <li>「<b>測定を始める</b>」を押す</li>
+      </ol>
+      <p class="muted">2回目からは前回の設定が入った状態で始まるので、そのまま「測定を始める」を押せます。</p>
+    </details>
+
+    <details class="box">
+      <summary>2. 声で記録する</summary>
+      <ol>
+        <li>「<b>🎤 聞き取り開始</b>」を押す。はじめてのときはマイクの使用を聞かれるので「<b>許可</b>」を押す</li>
+        <li><b>黄色の枠</b>の項目に入る数字を言う。入ると次の項目に枠が移ります</li>
+        <li>全部の項目がそろうと、1尾分が確定して<b>ピッ</b>と鳴り、値を読み上げます。続けて次の魚を測ります</li>
+      </ol>
+      <ul>
+        <li>1回で続けて言っても大丈夫です（例：「25.3　312」）</li>
+        <li>最後の数字を言ってから約1.5秒で確定します。言いよどんでも（「さんびゃく…じゅうに」）1つの数字にまとめます</li>
+        <li><b>7 は「なな」</b>と言ってください（「いち」と「しち」は聞き間違えやすいため）</li>
+        <li>話す声が聞こえた文字は「聞き取り：」の欄に出ます。おかしいときはここを見てください</li>
+      </ul>
+      <table class="saytable">
+        <thead><tr><th>言うこと</th><th>何が起きるか</th></tr></thead>
+        <tbody>
+          <tr><td>「25.3」「にじゅうごてんさん」</td><td>黄色の枠の項目に入る</td></tr>
+          <tr><td>「1.2キロ」「253ミリ」</td><td>単位を直して入る（1200 g、25.3 cm）</td></tr>
+          <tr><td>「オス」「メス」「不明」</td><td>性別に入る</td></tr>
+          <tr><td>「体重 312」</td><td>言った項目に入る（順番を飛ばせる）</td></tr>
+          <tr><td>「とりけし」</td><td>直前の値を消す（前の魚にも戻れる）</td></tr>
+          <tr><td>「なし」</td><td>今の項目を空欄にして次へ</td></tr>
+          <tr><td>「つぎ」</td><td>残りを空欄にして、この魚を確定</td></tr>
+          <tr><td>「メモ 尾びれに傷」</td><td>今の魚にメモを付ける</td></tr>
+        </tbody>
+      </table>
+      <p class="muted">声のほかに、画面の欄に手で数字を入れたり、下のボタン（取り消し・空欄で次へ・この魚を確定）を押したりもできます。</p>
+    </details>
+
+    <details class="box">
+      <summary>3. 間違えたとき・おかしな値のとき</summary>
+      <ul>
+        <li>言い間違えたら「<b>とりけし</b>」と言って、言い直す</li>
+        <li>右の一覧の<b>行をタップ</b>すると、値やメモを直したり、行を消したりできます</li>
+        <li>5尾以上記録すると、ほかの魚と比べて<b>けた違いの値</b>や<b>体長のわりに重すぎる・軽すぎる値</b>に赤い印が付き、ブザーで知らせます。測り直すか、行をタップして直してください</li>
+      </ul>
+    </details>
+
+    <details class="box">
+      <summary>4. 画面の右上の表示</summary>
+      <ul>
+        <li><b>✓ 送信済み</b>：スプレッドシートに保存されています</li>
+        <li><b>未送信</b>：まだ送れていません。記録は端末に残っているので消えません。電波のある所で「今すぐ送信」を押してください</li>
+        <li><b>☀ 画面ON</b>：測定のあいだ、画面が暗くならないようにしています。この表示が出ていないとき、注意の文が出たときは、省電力モードを切ってください</li>
+      </ul>
+    </details>
+
+    <details class="box">
+      <summary>5. 測り終わったら</summary>
+      <ul>
+        <li>左上の <b>←</b> を押すと、はじめの画面に戻り、記録が送られます</li>
+        <li>はじめの画面の「これまでの記録」から、<b>続ける</b>（続きを測る）・<b>シートを開く</b>（スプレッドシートを見る）・<b>CSV保存</b>（端末に控えを取る）ができます</li>
+        <li>「消す」は<b>この端末から</b>消すだけです。スプレッドシートの記録は残ります（未送信の変更がある場合は、送ってから消してください）</li>
+      </ul>
+    </details>
+
+    <details class="box">
+      <summary>うまくいかないとき</summary>
+      <dl>
+        <dt>声が入らない・🎤 を押しても反応しない</dt>
+        <dd>マイクの使用を「許可」したか確かめてください。iPhone は Safari で開いてください。周りがうるさいときは、口元のマイクを使うか、端末に近づいて話してください。</dd>
+        <dt>数字が違って入る</dt>
+        <dd>「とりけし」で消して、はっきり言い直してください。7 は「なな」、小数点は「てん」と言います。</dd>
+        <dt>画面が暗くなる</dt>
+        <dd>省電力モードを切ってください。それでも暗くなるときは、端末の設定で自動ロックまでの時間を長くしてください。</dd>
+        <dt>「未送信」のまま</dt>
+        <dd>電波のある所で「今すぐ送信」を押してください。送れるまで、記録は端末に残っています。</dd>
+        <dt>Android で「ピロン」と鳴る</dt>
+        <dd>聞き取りを始めるたびに Android が鳴らす音です。アプリからは消せません。そのまま使えます。</dd>
+        <dt>直ったと聞いたのに、前と変わらない</dt>
+        <dd>はじめの画面の下にある「版」の番号を確かめて、ページを再読み込みしてください。それでも変わらなければ、タブを閉じて開き直してください。</dd>
+      </dl>
+    </details>
+
+    <button class="big primary" id="helpDone">はじめる</button>
+  </main>
+</section>
+
 <!-- 何を記録するかを決める画面 -->
 <section id="setup" class="screen" hidden>
-  <header class="bar"><button class="back" data-go="home">←</button><h1>記録の準備</h1></header>
+  <header class="bar"><button class="back" data-go="home">←</button><h1>記録の準備</h1><button class="barbtn" data-help>📖 使い方</button></header>
   <main class="pad">
     <h2 class="first">所属 <small class="muted">（記録の保存先が変わります）</small></h2>
     <div id="orgChoice" class="seg" role="radiogroup">
@@ -127,9 +246,9 @@
   </form>
 </dialog>
 
-<script src="nosleep-media.js?v=2026-11-06a"></script>
-<script src="parse.js?v=2026-11-06a"></script>
-<script src="core.js?v=2026-11-06a"></script>
-<script src="app.js?v=2026-11-06a"></script>
+<script src="nosleep-media.js?v=2026-11-06b"></script>
+<script src="parse.js?v=2026-11-06b"></script>
+<script src="core.js?v=2026-11-06b"></script>
+<script src="app.js?v=2026-11-06b"></script>
 </body>
 </html>

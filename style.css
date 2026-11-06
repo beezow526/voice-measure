@@ -138,6 +138,26 @@ tbody tr.fresh td { animation: fresh 1.2s; }
 .sync { font-size: 14px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.18); white-space: nowrap; }
 .sync.err { background: var(--bad); color: #fff; }
 
+/* 使い方の画面 */
+.bar .barbtn { background: rgba(255,255,255,.18); color: inherit; border: 0; min-height: 40px; padding: 4px 12px; font-size: 15px; white-space: nowrap; }
+.help .lead { font-size: 18px; margin-top: 0; }
+.help .steps { display: grid; gap: 10px; margin: 16px 0 8px; }
+.help .step { display: flex; gap: 12px; align-items: flex-start; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.help .step .num { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--primary); color: var(--primary-ink);
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; }
+@media (min-width: 700px) { .help .steps { grid-template-columns: repeat(3, 1fr); } }
+.help .box { margin-top: 12px; }
+.help .box summary { font-size: 18px; min-height: 40px; display: flex; align-items: center; }
+.help ul, .help ol { padding-left: 1.4em; margin: 8px 0; }
+.help li { margin: 6px 0; }
+.help ul ul { margin: 4px 0; }
+.help .saytable { margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.help .saytable th, .help .saytable td { position: static; text-align: left; white-space: normal; padding: 8px 10px; }
+.help .saytable td:first-child { font-weight: 600; }
+.help .saytable tbody tr { cursor: default; }
+.help dt { font-weight: 700; margin-top: 12px; }
+.help dd { margin: 4px 0 0; }
+
 dialog { border: 0; border-radius: 16px; padding: 16px 20px; width: min(520px, calc(100vw - 32px)); background: var(--card); color: var(--ink); }
 dialog::backdrop { background: rgba(0,0,0,.45); }
 dialog h2 { margin-top: 0; }
